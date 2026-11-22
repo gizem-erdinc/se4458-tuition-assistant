@@ -24,6 +24,8 @@ flowchart TB
 The LLM never calls a backend. It returns tool calls; the agent validates and executes them and returns the
 results to the LLM, which writes a grounded answer with policy section references.
 
+**Demo video (5 min, no narration):** https://youtu.be/c7eoHBfhmZI
+
 ## Contents
 1. [Requirement checklist](#1-requirement-checklist)
 2. [Run it](#2-run-it)
@@ -37,7 +39,7 @@ results to the LLM, which writes a grounded answer with policy section reference
 10. [Cloud deployment](#10-cloud-deployment)
 11. [LLM cost and low-cost testing](#11-llm-cost-and-low-cost-testing)
 12. [Assumptions](#12-assumptions)
-13. [Demo video checklist](#13-demo-video-checklist)
+13. [Demo video](#13-demo-video)
 14. [Project structure](#14-project-structure)
 
 ---
@@ -59,7 +61,8 @@ results to the LLM, which writes a grounded answer with policy section reference
 | ER / data model | [`docs/er-diagram.png`](docs/er-diagram.png), `tuition_api/schema.sql` |
 | Unit tests for every REST operation (success + failure), runnable without cloud or LLM | `tests/`, [`docs/evidence/pytest_output.txt`](docs/evidence/pytest_output.txt), CI in `.github/workflows/tests.yml` (§9) |
 | Tool trace (tool names, inputs, results, final answer) | `python -m agent.cli --demo` → `docs/traces/*.json`; trace panel in the chat UI |
-| Cloud deployment (API, MCP, gateway, DB) | `deploy/azure/deploy.sh` (§10) |
+| Cloud deployment (API, MCP, gateway, DB) | `deploy/azure/deploy.sh`, live URLs (§10) |
+| Short demonstration video | https://youtu.be/c7eoHBfhmZI (§13) |
 | LLM cost + low-cost approach | §11 |
 | Assumptions | §12 |
 
@@ -483,19 +486,28 @@ Ways to keep the cost low or zero:
 * Validation errors return 400 (`VALIDATION_ERROR`) with per-field details. Business-rule conflicts return
   409/422 with stable `code` values.
 
-## 13. Demo video checklist
+## 13. Demo video
 
-1. `docker compose up` / `run_all.py`; show `/gateway/routes` and Swagger at the gateway URL.
-2. `pytest -v` → 63 passed.
-3. `python -m mcp_server.demo_queries` → three retrieval queries.
-4. Gateway: protected route without and with token, 403 for another student, mobile query 4× → 429
-   (`scripts/gateway_evidence.py`).
-5. Chat UI as `20210001`, with the trace panel open:
-   * "When is the payment deadline?" (MCP)
-   * "What is my balance?" (REST)
-   * "Can I pay my outstanding balance in installments?" (both)
-   * "Pay part of my balance" → give the amount → **Confirm** → the balance drops.
-6. Ask "What is the balance of student 20210002?" → refused (own account only).
+**https://youtu.be/c7eoHBfhmZI** (5:16, screen recording without narration; section titles are printed in the terminal).
+Everything after 1:40 runs against the **Azure deployment**.
+
+| Time (≈) | What is shown |
+|---|---|
+| 0:00 | README: architecture diagram and requirement checklist |
+| 0:35 | **How unit tests are run:** `pytest -q` → 63 passed (`scripts/video_demo.ps1`) |
+| 1:10 | **Three MCP retrieval tests** through the MCP protocol → §2.1, §3.1, §6.1 |
+| 1:20 | **Protected gateway route:** no token → 401, student JWT → 200, other student → 403 |
+| 1:25 | Rate limit: mobile query ×3 → 200, 4th → 429; direct call to the API → 403 `DIRECT_ACCESS_FORBIDDEN` |
+| 1:45 | GitHub Actions: tests passing in CI |
+| 1:55 | Gateway route table and Swagger UI (cloud) |
+| 2:43 | Agent, **MCP only**: "When is the payment deadline?" |
+| 2:57 | Agent, **REST only**: "What is my balance?" |
+| 3:15 | Agent, **MCP + REST**: "Can I pay my outstanding balance in installments?" |
+| 3:30 | **Confirmed simulated payment:** "Pay part of my balance" → asks for amount → confirmation card → Confirm → `POST /payments` 201, remaining 2,000 |
+| 4:35 | Another student's balance is refused |
+| 5:00 | README: test data and reproduction steps |
+
+The terminal part can be replayed with `.\scripts\video_demo.ps1` (Windows PowerShell).
 
 ## 14. Project structure
 
