@@ -1,0 +1,1044 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Tuition API",
+    "description": "Tuition business service for the University Mobile App, Banking App, University Web Site (admin) and the AI Tuition Assistant. **All public traffic goes through the API Gateway** (`/api/v1/...`). Obtain a JWT with `POST /api/v1/auth/token`, then use *Authorize*.\n\nErrors always have the shape `{\"error\": {\"code\", \"message\", \"details\"?}}`.",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": [
+          "ops"
+        ],
+        "summary": "Health",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/token": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Login",
+        "operationId": "login_api_v1_auth_token_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TokenRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/mobile/tuition/{studentNo}": {
+      "get": {
+        "tags": [
+          "mobile"
+        ],
+        "summary": "Query tuition (no auth; gateway limits to 3 calls/student/day)",
+        "operationId": "mobile_query_api_v1_mobile_tuition__studentNo__get",
+        "parameters": [
+          {
+            "name": "studentNo",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Studentno"
+            }
+          },
+          {
+            "name": "term",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^\\d{4}-(FALL|SPRING|SUMMER)$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "If given: balance for that term. If omitted: overall balance across all terms.",
+              "title": "Term"
+            },
+            "description": "If given: balance for that term. If omitted: overall balance across all terms."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TuitionQueryResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/banking/tuition/{studentNo}": {
+      "get": {
+        "tags": [
+          "banking"
+        ],
+        "summary": "Query tuition (auth required)",
+        "operationId": "banking_query_api_v1_banking_tuition__studentNo__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "studentNo",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Studentno"
+            }
+          },
+          {
+            "name": "term",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^\\d{4}-(FALL|SPRING|SUMMER)$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "If given: balance for that term. If omitted: overall balance across all terms.",
+              "title": "Term"
+            },
+            "description": "If given: balance for that term. If omitted: overall balance across all terms."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TuitionQueryResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/banking/payments": {
+      "post": {
+        "tags": [
+          "banking"
+        ],
+        "summary": "Pay tuition (simulated, auth required)",
+        "operationId": "banking_pay_api_v1_banking_payments_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-payment-channel",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Payment-Channel"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/tuition": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Create or update tuition for a student/term",
+        "operationId": "admin_add_api_v1_admin_tuition_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddTuitionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AddTuitionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/tuition/batch": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Batch create/update tuition from CSV (studentNo,term,amount,currency)",
+        "operationId": "admin_batch_api_v1_admin_tuition_batch_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_admin_batch_api_v1_admin_tuition_batch_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/tuition/unpaid": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Paged list of students with unpaid balance for a term",
+        "operationId": "admin_unpaid_api_v1_admin_tuition_unpaid_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "term",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(FALL|SPRING|SUMMER)$",
+              "title": "Term"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Pagesize"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnpaidPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AddTuitionRequest": {
+        "properties": {
+          "studentNo": {
+            "type": "string",
+            "pattern": "^\\d{8}$",
+            "title": "Studentno"
+          },
+          "term": {
+            "type": "string",
+            "pattern": "^\\d{4}-(FALL|SPRING|SUMMER)$",
+            "title": "Term"
+          },
+          "amount": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Amount"
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Za-z]{3}$",
+            "title": "Currency"
+          }
+        },
+        "type": "object",
+        "required": [
+          "studentNo",
+          "term",
+          "amount",
+          "currency"
+        ],
+        "title": "AddTuitionRequest"
+      },
+      "AddTuitionResponse": {
+        "properties": {
+          "transactionStatus": {
+            "type": "string",
+            "enum": [
+              "CREATED",
+              "UPDATED",
+              "UNCHANGED"
+            ],
+            "title": "Transactionstatus"
+          },
+          "studentNo": {
+            "type": "string",
+            "title": "Studentno"
+          },
+          "term": {
+            "type": "string",
+            "title": "Term"
+          },
+          "amount": {
+            "type": "number",
+            "title": "Amount"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "previousAmount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previousamount"
+          }
+        },
+        "type": "object",
+        "required": [
+          "transactionStatus",
+          "studentNo",
+          "term",
+          "amount",
+          "currency"
+        ],
+        "title": "AddTuitionResponse"
+      },
+      "BatchResponse": {
+        "properties": {
+          "transactionStatus": {
+            "type": "string",
+            "enum": [
+              "COMPLETED",
+              "COMPLETED_WITH_ERRORS",
+              "FAILED"
+            ],
+            "title": "Transactionstatus"
+          },
+          "totalRows": {
+            "type": "integer",
+            "title": "Totalrows"
+          },
+          "succeeded": {
+            "type": "integer",
+            "title": "Succeeded"
+          },
+          "failed": {
+            "type": "integer",
+            "title": "Failed"
+          },
+          "created": {
+            "type": "integer",
+            "title": "Created"
+          },
+          "updated": {
+            "type": "integer",
+            "title": "Updated"
+          },
+          "unchanged": {
+            "type": "integer",
+            "title": "Unchanged"
+          },
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/BatchRowError"
+            },
+            "type": "array",
+            "title": "Errors"
+          }
+        },
+        "type": "object",
+        "required": [
+          "transactionStatus",
+          "totalRows",
+          "succeeded",
+          "failed",
+          "created",
+          "updated",
+          "unchanged",
+          "errors"
+        ],
+        "title": "BatchResponse"
+      },
+      "BatchRowError": {
+        "properties": {
+          "line": {
+            "type": "integer",
+            "title": "Line"
+          },
+          "studentNo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Studentno"
+          },
+          "term": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Term"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "line",
+          "code",
+          "message"
+        ],
+        "title": "BatchRowError"
+      },
+      "Body_admin_batch_api_v1_admin_tuition_batch_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_admin_batch_api_v1_admin_tuition_batch_post"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "PaymentRequest": {
+        "properties": {
+          "studentNo": {
+            "type": "string",
+            "pattern": "^\\d{8}$",
+            "title": "Studentno"
+          },
+          "term": {
+            "type": "string",
+            "pattern": "^\\d{4}-(FALL|SPRING|SUMMER)$",
+            "title": "Term"
+          },
+          "amount": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Amount"
+          },
+          "transactionId": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 8,
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "title": "Transactionid"
+          }
+        },
+        "type": "object",
+        "required": [
+          "studentNo",
+          "term",
+          "amount",
+          "transactionId"
+        ],
+        "title": "PaymentRequest"
+      },
+      "PaymentResponse": {
+        "properties": {
+          "paymentStatus": {
+            "type": "string",
+            "const": "SUCCESS",
+            "title": "Paymentstatus"
+          },
+          "coverage": {
+            "type": "string",
+            "enum": [
+              "PARTIAL",
+              "FULL"
+            ],
+            "title": "Coverage"
+          },
+          "transactionId": {
+            "type": "string",
+            "title": "Transactionid"
+          },
+          "studentNo": {
+            "type": "string",
+            "title": "Studentno"
+          },
+          "term": {
+            "type": "string",
+            "title": "Term"
+          },
+          "paidAmount": {
+            "type": "number",
+            "title": "Paidamount"
+          },
+          "remainingBalance": {
+            "type": "number",
+            "title": "Remainingbalance"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "paidAt": {
+            "type": "string",
+            "title": "Paidat"
+          }
+        },
+        "type": "object",
+        "required": [
+          "paymentStatus",
+          "coverage",
+          "transactionId",
+          "studentNo",
+          "term",
+          "paidAmount",
+          "remainingBalance",
+          "currency",
+          "paidAt"
+        ],
+        "title": "PaymentResponse"
+      },
+      "TermBalance": {
+        "properties": {
+          "term": {
+            "type": "string",
+            "title": "Term"
+          },
+          "tuitionTotal": {
+            "type": "number",
+            "title": "Tuitiontotal"
+          },
+          "paidTotal": {
+            "type": "number",
+            "title": "Paidtotal"
+          },
+          "balance": {
+            "type": "number",
+            "title": "Balance"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PAID",
+              "PARTIALLY_PAID",
+              "UNPAID"
+            ],
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "term",
+          "tuitionTotal",
+          "paidTotal",
+          "balance",
+          "status"
+        ],
+        "title": "TermBalance"
+      },
+      "TokenRequest": {
+        "properties": {
+          "username": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Username"
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "username",
+          "password"
+        ],
+        "title": "TokenRequest"
+      },
+      "TokenResponse": {
+        "properties": {
+          "accessToken": {
+            "type": "string",
+            "title": "Accesstoken"
+          },
+          "tokenType": {
+            "type": "string",
+            "const": "Bearer",
+            "title": "Tokentype",
+            "default": "Bearer"
+          },
+          "expiresIn": {
+            "type": "integer",
+            "title": "Expiresin"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role"
+          }
+        },
+        "type": "object",
+        "required": [
+          "accessToken",
+          "expiresIn",
+          "role"
+        ],
+        "title": "TokenResponse"
+      },
+      "TuitionQueryResponse": {
+        "properties": {
+          "studentNo": {
+            "type": "string",
+            "title": "Studentno"
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "TERM",
+              "OVERALL"
+            ],
+            "title": "Scope"
+          },
+          "term": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Term"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "tuitionTotal": {
+            "type": "number",
+            "title": "Tuitiontotal"
+          },
+          "paidTotal": {
+            "type": "number",
+            "title": "Paidtotal"
+          },
+          "balance": {
+            "type": "number",
+            "title": "Balance"
+          },
+          "terms": {
+            "items": {
+              "$ref": "#/components/schemas/TermBalance"
+            },
+            "type": "array",
+            "title": "Terms"
+          }
+        },
+        "type": "object",
+        "required": [
+          "studentNo",
+          "scope",
+          "term",
+          "currency",
+          "tuitionTotal",
+          "paidTotal",
+          "balance",
+          "terms"
+        ],
+        "title": "TuitionQueryResponse"
+      },
+      "UnpaidItem": {
+        "properties": {
+          "studentNo": {
+            "type": "string",
+            "title": "Studentno"
+          },
+          "tuitionTotal": {
+            "type": "number",
+            "title": "Tuitiontotal"
+          },
+          "paidTotal": {
+            "type": "number",
+            "title": "Paidtotal"
+          },
+          "balance": {
+            "type": "number",
+            "title": "Balance"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          }
+        },
+        "type": "object",
+        "required": [
+          "studentNo",
+          "tuitionTotal",
+          "paidTotal",
+          "balance",
+          "currency"
+        ],
+        "title": "UnpaidItem"
+      },
+      "UnpaidPage": {
+        "properties": {
+          "term": {
+            "type": "string",
+            "title": "Term"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "pageSize": {
+            "type": "integer",
+            "title": "Pagesize"
+          },
+          "totalItems": {
+            "type": "integer",
+            "title": "Totalitems"
+          },
+          "totalPages": {
+            "type": "integer",
+            "title": "Totalpages"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/UnpaidItem"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "term",
+          "page",
+          "pageSize",
+          "totalItems",
+          "totalPages",
+          "items"
+        ],
+        "title": "UnpaidPage"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    },
+    "securitySchemes": {
+      "HTTPBearer": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "auth",
+      "description": "JWT issuing"
+    },
+    {
+      "name": "mobile",
+      "description": "University Mobile App \u2014 no auth, 3 calls/student/day (gateway)"
+    },
+    {
+      "name": "banking",
+      "description": "Banking App \u2014 JWT (student: own account only; bank: any)"
+    },
+    {
+      "name": "admin",
+      "description": "University Web Site admin \u2014 JWT with role admin"
+    }
+  ],
+  "servers": [
+    {
+      "url": "http://localhost:8000",
+      "description": "API Gateway (local)"
+    },
+    {
+      "url": "https://<your-gateway-host>",
+      "description": "API Gateway (cloud)"
+    }
+  ]
+}

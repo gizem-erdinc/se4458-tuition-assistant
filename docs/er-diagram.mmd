@@ -1,0 +1,51 @@
+erDiagram
+    students ||--o{ tuition : "is billed"
+    students ||--o| app_users : "logs in as"
+    tuition ||--o{ payments : "is paid by"
+    students {
+        varchar8 student_no PK "8 digits"
+        text full_name
+        timestamptz created_at
+    }
+    app_users {
+        varchar64 username PK "= student_no for students"
+        text password_hash "PBKDF2-SHA256"
+        varchar16 role "student | bank | admin"
+        varchar8 student_no FK "NULL for bank/admin"
+        text display_name
+    }
+    tuition {
+        varchar8 student_no PK, FK
+        varchar12 term PK "YYYY-FALL|SPRING|SUMMER"
+        numeric amount "NUMERIC(12,2) >= 0"
+        char3 currency "one currency per student"
+        timestamptz created_at
+        timestamptz updated_at
+    }
+    payments {
+        varchar64 transaction_id PK "duplicate protection"
+        varchar8 student_no FK
+        varchar12 term FK
+        numeric amount "NUMERIC(12,2) > 0"
+        varchar32 channel "banking-app | ai-assistant"
+        varchar80 paid_by "authenticated principal"
+        timestamptz created_at
+    }
+    tuition_batch_imports {
+        bigserial id PK
+        varchar64 uploaded_by
+        text file_name
+        varchar24 status
+        int total_rows
+        int succeeded
+        int failed
+        int created
+        int updated
+        int unchanged
+        timestamptz created_at
+    }
+    gateway_rate_counters {
+        varchar100 limit_key PK "route id + studentNo"
+        date window_day PK "Europe/Istanbul day"
+        int count
+    }

@@ -1,0 +1,59 @@
+# Local stack that mirrors the cloud deployment.
+#   docker compose up -d --build
+#   docker compose run --rm tuition-api python -m tuition_api.seed     # load test data
+#   open http://localhost:8080 (chat)  http://localhost:8000/docs (Swagger via gateway)
+# Only the gateway (8000), the chat UI (8080) and the MCP endpoint (8765) are published;
+# the Tuition API is reachable only through the gateway.
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: tuition
+    ports: ["5432:5432"]          # published for local tests (pytest) only
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d tuition"]
+      interval: 3s
+      retries: 20
+
+  tuition-api:
+    build: .
+    environment: &common
+      SERVICE: tuition-api
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/tuition
+      JWT_SECRET: ${JWT_SECRET:-local-dev-secret-change-me-0123456789abcdef}
+    expose: ["8001"]
+    depends_on:
+      db: {condition: service_healthy}
+
+  gateway:
+    build: .
+    environment:
+      <<: *common
+      SERVICE: gateway
+      TUITION_API_URL: http://tuition-api:8001
+    ports: ["8000:8000"]
+    depends_on: [tuition-api]
+
+  mcp-server:
+    build: .
+    environment:
+      SERVICE: mcp-server
+    ports: ["8765:8765"]
+
+  agent:
+    build: .
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      SERVICE: agent
+      GATEWAY_URL: http://gateway:8000
+      MCP_SERVER_URL: http://mcp-server:8765/mcp
+    ports: ["8080:8080"]
+    depends_on: [gateway, mcp-server]
+
+volumes:
+  pgdata:

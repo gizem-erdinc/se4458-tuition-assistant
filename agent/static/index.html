@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>University Tuition Assistant</title>
+<style>
+  :root { --blue:#1d4f91; --blue-2:#e8eef8; --ink:#1c2433; --muted:#6b7487; --line:#dfe4ee;
+          --green:#e6f4ef; --green-ink:#17694b; --amber:#fff6e0; --amber-ink:#8a5a00; --red:#b3261e; }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin:0; background:#f2f4f8; color:var(--ink); font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; }
+  .card { max-width:860px; margin:24px auto; background:#fff; border:1px solid var(--line); border-radius:14px; overflow:hidden; }
+  header { background:var(--blue); color:#fff; padding:16px 22px; display:flex; align-items:center; gap:12px; }
+  header h1 { font-size:19px; margin:0; flex:1; }
+  .dot { width:11px; height:11px; border-radius:50%; background:#9aa5b8; }
+  .dot.on { background:#3ddc97; }
+  #who { font-size:13px; opacity:.85; }
+  main { padding:18px 22px; min-height:380px; }
+  .label { font-size:11px; letter-spacing:.08em; font-weight:700; color:var(--muted); text-transform:uppercase; margin:16px 0 6px; }
+  .label.blue { color:var(--blue); }
+  .user { background:var(--blue-2); border-radius:10px; padding:10px 14px; display:inline-block; max-width:85%; }
+  .trace-row { display:grid; grid-template-columns:150px 1fr; gap:10px; border:1px solid var(--line); border-radius:8px;
+               padding:7px 12px; margin:5px 0; background:#f8fafd; font-size:13px; cursor:pointer; }
+  .trace-row b { color:var(--blue); font-size:12px; }
+  .trace-row.MCP b { color:#0f7d6b; } .trace-row.CONFIRMATION b { color:var(--amber-ink); } .trace-row.GUARD b { color:var(--red); }
+  .trace-row pre { grid-column:1/-1; display:none; margin:6px 0 0; white-space:pre-wrap; font-size:12px; background:#fff;
+                   border:1px solid var(--line); border-radius:6px; padding:8px; max-height:300px; overflow:auto; }
+  .trace-row.open pre { display:block; }
+  .answer { background:var(--green); color:#103d2e; border-radius:10px; padding:12px 14px; }
+  .confirm { background:var(--amber); border:1px solid #f0d48a; border-radius:10px; padding:12px 14px; margin-top:8px; }
+  .confirm table { font-size:14px; margin:6px 0 10px; } .confirm td { padding:1px 14px 1px 0; }
+  button { font:inherit; border:0; border-radius:8px; padding:8px 16px; cursor:pointer; }
+  .primary { background:var(--blue); color:#fff; } .ghost { background:#fff; border:1px solid var(--line); }
+  button:disabled { opacity:.5; cursor:default; }
+  footer { border-top:1px solid var(--line); padding:12px 22px; display:flex; gap:8px; }
+  input { font:inherit; padding:9px 12px; border:1px solid var(--line); border-radius:8px; flex:1; }
+  #login { padding:40px 22px; display:flex; flex-direction:column; gap:10px; max-width:360px; margin:auto; }
+  .hint { font-size:13px; color:var(--muted); }
+  .examples button { background:#fff; border:1px solid var(--line); font-size:13px; padding:5px 10px; margin:3px 4px 3px 0; }
+  .err { color:var(--red); font-size:13px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <header><span class="dot" id="dot"></span><h1>University Tuition Assistant</h1><span id="who"></span></header>
+
+  <section id="login">
+    <div class="label blue">Student sign-in</div>
+    <input id="sn" placeholder="Student number (e.g. 20210001)" value="20210001">
+    <input id="pw" type="password" placeholder="Password" value="student123">
+    <button class="primary" onclick="login()">Sign in</button>
+    <div class="err" id="loginErr"></div>
+    <div class="hint">Demo accounts: 20210001…20210004 / student123</div>
+  </section>
+
+  <main id="chat" hidden>
+    <div class="examples" id="examples"><div class="label">Try</div></div>
+  </main>
+  <footer id="composer" hidden>
+    <input id="msg" placeholder="Ask about deadlines, your balance, installments, or make a payment…"
+           onkeydown="if(event.key==='Enter')send()">
+    <button class="primary" id="sendBtn" onclick="send()">Send</button>
+  </footer>
+</div>
+
+<script>
+let sid = null;
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const md = (s) => esc(s).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/\n/g, "<br>");
+const EXAMPLES = ["When is the payment deadline?", "What is my balance?",
+  "Can I pay my outstanding balance in installments?", "Pay part of my balance", "Pay 1000 USD for 2027-SPRING"];
+
+async function api(path, body) {
+  const r = await fetch(path, {method:"POST", headers:{"Content-Type":"application/json", ...(sid?{"X-Session-Id":sid}:{})},
+                               body: JSON.stringify(body)});
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.detail || r.statusText);
+  return data;
+}
+
+async function login() {
+  $("loginErr").textContent = "";
+  try {
+    const d = await api("/api/login", {studentNo: $("sn").value.trim(), password: $("pw").value});
+    sid = d.sessionId;
+    $("who").textContent = `Student ${d.studentNo} · ${d.model}`;
+    $("dot").classList.add("on");
+    $("login").hidden = true; $("chat").hidden = false; $("composer").hidden = false;
+    for (const e of EXAMPLES) {
+      const b = document.createElement("button"); b.textContent = e;
+      b.onclick = () => { $("msg").value = e; send(); }; $("examples").appendChild(b);
+    }
+    $("msg").focus();
+  } catch (e) { $("loginErr").textContent = e.message; }
+}
+
+function summarize(ev) {
+  const o = ev.output;
+  if (ev.type === "LLM") {
+    if (ev.status === "error") return "error: " + o;
+    const t = o.selected_tools;
+    return t === "none (final answer)" ? "Writes grounded answer from tool results"
+         : "Chooses " + t.map(x => `${x.name}(${Object.entries(x.arguments).map(([k,v]) => `${k}=${JSON.stringify(v)}`).join(", ")})`).join(" + ");
+  }
+  if (ev.type === "MCP") return `${ev.name}(${JSON.stringify(ev.input?.query)}) → ` +
+      (o.matches || []).map(r => `§${r.section} ${r.heading}`).join(", ");
+  if (ev.type === "REST via Gateway") {
+    const bal = o?.balance !== undefined ? ` → balance ${o.balance} ${o.currency}` :
+                o?.paymentStatus ? ` → ${o.paymentStatus}, remaining ${o.remainingBalance} ${o.currency}` :
+                o?.error ? ` → ${o.error.code}` : "";
+    return `${ev.endpoint} [${ev.status}]${bal}`;
+  }
+  if (ev.type === "CONFIRMATION") return `${ev.status}: ${o?.amount} ${o?.currency ?? ""} for ${o?.term ?? ""}`;
+  return `${ev.status}: ${typeof o === "string" ? o : JSON.stringify(o)}`;
+}
+
+function addTrace(trace) {
+  if (!trace.length) return;
+  const wrap = document.createElement("div");
+  wrap.innerHTML = `<div class="label blue">Agent tool execution</div>`;
+  for (const ev of trace) {
+    const row = document.createElement("div");
+    row.className = "trace-row " + ev.type.split(" ")[0];
+    row.innerHTML = `<b>${esc(ev.type)}</b><span>${esc(summarize(ev))} <span class="hint">${ev.ms ? ev.ms + " ms" : ""}</span></span>
+      <pre>${esc(JSON.stringify({tool: ev.name, input: ev.input, output: ev.output}, null, 2))}</pre>`;
+    row.onclick = () => row.classList.toggle("open");
+    wrap.appendChild(row);
+  }
+  $("chat").appendChild(wrap);
+}
+
+function addReply(d) {
+  addTrace(d.trace);
+  const box = document.createElement("div");
+  box.innerHTML = `<div class="label blue">AI assistant response</div><div class="answer">${md(d.reply)}</div>`;
+  $("chat").appendChild(box);
+  if (d.pendingAction) {
+    const p = d.pendingAction, c = document.createElement("div");
+    c.className = "confirm";
+    c.innerHTML = `<b>Confirm payment</b>
+      <table><tr><td>Student</td><td>${esc(p.studentNo)}</td></tr><tr><td>Term</td><td>${esc(p.term)}</td></tr>
+      <tr><td>Amount</td><td><b>${p.amount.toFixed(2)} ${esc(p.currency)}</b></td></tr>
+      <tr><td>Balance</td><td>${p.balanceBefore.toFixed(2)} → ${p.balanceAfter.toFixed(2)} ${esc(p.currency)}</td></tr>
+      <tr><td>Transaction</td><td>${esc(p.transactionId)}</td></tr></table>`;
+    const ok = document.createElement("button"); ok.className = "primary"; ok.textContent = "Confirm payment";
+    const no = document.createElement("button"); no.className = "ghost"; no.textContent = "Cancel";
+    no.style.marginLeft = "8px";
+    const decide = async (approve) => {
+      ok.disabled = no.disabled = true;
+      try { addReply(await api("/api/confirm", {actionId: p.actionId, approve})); }
+      catch (e) { addError(e); }
+    };
+    ok.onclick = () => decide(true); no.onclick = () => decide(false);
+    c.append(ok, no); $("chat").appendChild(c);
+  }
+  window.scrollTo(0, document.body.scrollHeight);
+}
+
+function addError(e) {
+  const d = document.createElement("div"); d.className = "err"; d.textContent = e.message; $("chat").appendChild(d);
+}
+
+async function send() {
+  const text = $("msg").value.trim(); if (!text) return;
+  $("msg").value = ""; $("sendBtn").disabled = true;
+  const u = document.createElement("div");
+  u.innerHTML = `<div class="label">Student</div><div class="user">${esc(text)}</div>`;
+  $("chat").appendChild(u);
+  document.querySelectorAll(".confirm button").forEach(b => b.disabled = true);
+  try { addReply(await api("/api/chat", {message: text})); } catch (e) { addError(e); }
+  $("sendBtn").disabled = false; $("msg").focus();
+}
+</script>
+</body>
+</html>

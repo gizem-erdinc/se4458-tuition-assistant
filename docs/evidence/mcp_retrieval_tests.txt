@@ -1,0 +1,22 @@
+﻿MCP tools: ['search_tuition_policies']
+
+Q: When is the fall term payment deadline?
+   document=University_Tuition_Policies.md (UNI-TUITION-2026-01), matches=2
+  [ 9.143] Section 2.1 ÔÇö Payment deadlines ÔÇ║ Fall term
+           The payment deadline for the Fall 2026 term is **September 30, 2026**. A student should settle the outstanding balance or have an approved installmentÔÇĞ
+  [ 6.919] Section 8.1 ÔÇö Frequently asked questions ÔÇ║ When is the Fall tuition deadline?
+           September 30, 2026. See Section 2.1.ÔÇĞ
+
+Q: Who is eligible for an installment arrangement?
+   document=University_Tuition_Policies.md (UNI-TUITION-2026-01), matches=2
+  [ 9.073] Section 3.1 ÔÇö Installment policy ÔÇ║ Eligibility
+           Students with an outstanding balance of at least **$300** may request an installment arrangement. An arrangement is subject to approval; this policy dÔÇĞ
+  [ 3.999] Section 2.1 ÔÇö Payment deadlines ÔÇ║ Fall term
+           The payment deadline for the Fall 2026 term is **September 30, 2026**. A student should settle the outstanding balance or have an approved installmentÔÇĞ
+
+Q: How much refund do I get if I withdraw in the first two weeks?
+   document=University_Tuition_Policies.md (UNI-TUITION-2026-01), matches=2
+  [10.463] Section 6.1 ÔÇö Refunds and withdrawals ÔÇ║ Early withdrawal
+           A student who formally withdraws within **14 calendar days of the term start** may be eligible for a refund of **80% of tuition payments associated wiÔÇĞ
+  [ 7.513] Section 6.2 ÔÇö Refunds and withdrawals ÔÇ║ Later withdrawal
+           After the 14-day period, refunds are reviewed individually and are not guaranteed. The AI assistant should direct students to the university finance oÔÇĞ
