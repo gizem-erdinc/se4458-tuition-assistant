@@ -4,6 +4,8 @@
 """
 from __future__ import annotations
 
+import hmac
+import os
 import re
 from contextlib import asynccontextmanager
 from typing import Annotated
@@ -65,6 +67,20 @@ async def _http_error(_: Request, e: HTTPException):
     for k, v in (e.headers or {}).items():
         resp.headers[k] = v
     return resp
+
+
+@app.middleware("http")
+async def require_gateway(request: Request, call_next):
+    """Origin verification: when GATEWAY_SHARED_SECRET is set (cloud deployment),
+    every /api request must carry the secret the API Gateway adds. Direct calls
+    that bypass the gateway are rejected, so the gateway's auth/rate-limit
+    policies cannot be skipped. Unset (local dev/tests) -> check disabled."""
+    secret = os.environ.get("GATEWAY_SHARED_SECRET")
+    if secret and request.url.path.startswith("/api/"):
+        sent = request.headers.get("x-gateway-key", "")
+        if not hmac.compare_digest(sent.encode(), secret.encode()):
+            return _err(403, "DIRECT_ACCESS_FORBIDDEN", "Requests must go through the API Gateway")
+    return await call_next(request)
 
 
 @app.exception_handler(RequestValidationError)

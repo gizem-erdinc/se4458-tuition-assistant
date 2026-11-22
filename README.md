@@ -234,6 +234,11 @@ by automated tests.
 | admin-add-tuition-batch | `POST /api/v1/admin/tuition/batch` | tuition-api | JWT: admin | — |
 | admin-unpaid-tuition | `GET /api/v1/admin/tuition/unpaid` | tuition-api | JWT: admin | — |
 
+* **The gateway cannot be bypassed (origin verification):** in the cloud, the gateway adds a secret
+  `X-Gateway-Key` header (`GATEWAY_SHARED_SECRET`, stored as a Container App secret) to every upstream
+  request. The Tuition API rejects any `/api` request without it with `403 DIRECT_ACCESS_FORBIDDEN`.
+  Internal-only ingress was tried first, but service-name resolution did not work in this Container
+  Apps environment type, so the shared secret enforces the same rule at the application level.
 * **Authentication at the edge:** JWT signature, expiry, issuer and role are checked before forwarding
   (401/403). The API checks again (defence in depth) and also enforces ownership: a student token works only
   for that student's own number.
@@ -356,7 +361,7 @@ pytest -v
   real.
 * GitHub Actions runs the same suite on every push (`.github/workflows/tests.yml`).
 
-**Result: 62 passed.** See [`docs/evidence/pytest_output.txt`](docs/evidence/pytest_output.txt).
+**Result: 63 passed.** See [`docs/evidence/pytest_output.txt`](docs/evidence/pytest_output.txt).
 
 | Operation | Success tests | Failure / edge tests |
 |---|---|---|
@@ -377,7 +382,7 @@ The target is **Microsoft Azure** (works with an *Azure for Students* subscripti
 
 | Component | Azure service |
 |---|---|
-| Tuition API | Container App, **internal** ingress (not reachable from the internet) |
+| Tuition API | Container App; every `/api` call must carry the gateway's secret `X-Gateway-Key` header, so direct calls get **403 DIRECT_ACCESS_FORBIDDEN** (origin verification) |
 | API Gateway | Container App, external HTTPS ingress |
 | MCP server | Container App, external HTTPS ingress (`/mcp`) |
 | Agent / chat UI | Container App, external |
@@ -387,17 +392,32 @@ The target is **Microsoft Azure** (works with an *Azure for Students* subscripti
 ```bash
 az login
 export LLM_API_KEY=...            # agent only
-bash deploy/azure/deploy.sh       # builds the image in ACR, creates the DB and the 4 container apps, prints URLs
+bash deploy/azure/deploy.sh       # builds + pushes the image, creates the DB and the 4 container apps, prints URLs
 bash deploy/azure/seed.sh         # loads test data; writes docs/evidence/gateway_evidence_cloud.md
 az group delete -n rg-se4458-tuition --yes      # tear down after grading
 ```
 
+**Live deployment** (Azure for Students, region `swedencentral`; the subscription policy only allows
+denmarkeast, spaincentral, italynorth, swedencentral and switzerlandnorth):
+
 | | URL |
 |---|---|
-| Gateway | `https://<gateway>.azurecontainerapps.io` ← *fill in after deployment* |
-| Swagger | `https://<gateway>.azurecontainerapps.io/docs` |
-| MCP | `https://<mcp-server>.azurecontainerapps.io/mcp` |
-| Chat UI | `https://<agent>.azurecontainerapps.io` |
+| Gateway | https://gateway.wittydune-e15fb50a.swedencentral.azurecontainerapps.io |
+| Swagger (via gateway) | https://gateway.wittydune-e15fb50a.swedencentral.azurecontainerapps.io/docs |
+| Route table | https://gateway.wittydune-e15fb50a.swedencentral.azurecontainerapps.io/gateway/routes |
+| MCP server | https://mcp-server.wittydune-e15fb50a.swedencentral.azurecontainerapps.io/mcp |
+| Chat UI (agent) | https://agent.wittydune-e15fb50a.swedencentral.azurecontainerapps.io |
+| Tuition API | `tuition-api.…azurecontainerapps.io` — direct calls are rejected with 403 `DIRECT_ACCESS_FORBIDDEN` |
+
+Cloud evidence: [`docs/evidence/cloud_gateway_enforced.png`](docs/evidence/cloud_gateway_enforced.png)
+(gateway 200, rate limit 429, direct API call 403), [`docs/evidence/cloud_agent_combined.png`](docs/evidence/cloud_agent_combined.png)
+(agent → cloud MCP + cloud gateway → Azure PostgreSQL), [`docs/evidence/gateway_evidence_cloud.md`](docs/evidence/gateway_evidence_cloud.md).
+
+Deployment notes from the real run: the image was built with local Docker and pushed to ACR (ACR Tasks /
+`az acr build` can be unavailable on student subscriptions). Internal-ingress service names
+(`http://tuition-api`, `*.internal.*`) did not resolve in this environment, so the API is protected by the
+gateway shared secret instead (§6). The commands actually used are the same steps as `deploy/azure/deploy.sh`,
+run one by one in PowerShell.
 
 Secrets (DB URL, JWT secret, LLM key) are stored as Container App secrets, not in the image. Container Apps
 scale to zero, so cost is mainly the B1ms database. Remove the resource group after grading.
@@ -466,7 +486,7 @@ Ways to keep the cost low or zero:
 ## 13. Demo video checklist
 
 1. `docker compose up` / `run_all.py`; show `/gateway/routes` and Swagger at the gateway URL.
-2. `pytest -v` → 62 passed.
+2. `pytest -v` → 63 passed.
 3. `python -m mcp_server.demo_queries` → three retrieval queries.
 4. Gateway: protected route without and with token, 403 for another student, mobile query 4× → 429
    (`scripts/gateway_evidence.py`).
@@ -485,7 +505,7 @@ agent/          llm.py (Claude + OpenAI-compatible adapters), orchestrator.py (l
 mcp_server/     indexer.py (chunking + BM25), server.py (MCP tool), demo_queries.py, index/policy_index.json
 gateway/        main.py (routes, JWT at edge, per-student rate limit, proxy)
 tuition_api/    main.py (FastAPI + Swagger), service.py (business rules), schema.sql, db.py, security.py, seed.py
-tests/          62 tests: API, gateway, MCP/index, agent
+tests/          63 tests: API, gateway, MCP/index, agent
 deploy/azure/   deploy.sh, seed.sh
 docs/           University_Tuition_Policies.md (provided), openapi.json, er-diagram.png/.mmd, evidence/
 Dockerfile, docker-compose.yml, start.py, run_all.py, .env.example, .github/workflows/tests.yml

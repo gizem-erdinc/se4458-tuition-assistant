@@ -60,3 +60,16 @@ def test_route_table_and_swagger_published(gw):
     assert {"mobile-query-tuition", "banking-pay-tuition", "admin-unpaid-tuition"} <= ids
     spec = gw.get("/openapi.json").json()
     assert "/api/v1/banking/payments" in spec["paths"]
+
+
+def test_api_rejects_direct_calls_when_gateway_secret_is_set(api, gw, monkeypatch):
+    """Origin verification used in the cloud: the API accepts /api calls only with the
+    secret header that the gateway adds; clients cannot bypass the gateway."""
+    monkeypatch.setenv("GATEWAY_SHARED_SECRET", "test-gateway-secret")
+    direct = api.get("/api/v1/mobile/tuition/20210002")
+    assert direct.status_code == 403 and direct.json()["error"]["code"] == "DIRECT_ACCESS_FORBIDDEN"
+    spoofed = api.get("/api/v1/mobile/tuition/20210002", headers={"X-Gateway-Key": "guess"})
+    assert spoofed.status_code == 403
+    via_gateway = gw.get("/api/v1/mobile/tuition/20210002")
+    assert via_gateway.status_code == 200 and via_gateway.json()["balance"] == 9000.0
+    assert api.get("/health").status_code == 200                     # health probe stays open

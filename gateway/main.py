@@ -206,7 +206,10 @@ def create_app(transport: httpx.AsyncBaseTransport | None = None,
                                    rid, {**extra, "Retry-After": str(reset)}), rid, request, started, route)
 
         # ---- forward
-        headers = {k: v for k, v in request.headers.items() if k.lower() not in HOP_BY_HOP}
+        headers = {k: v for k, v in request.headers.items()
+                   if k.lower() not in HOP_BY_HOP and k.lower() != "x-gateway-key"}
+        if os.environ.get("GATEWAY_SHARED_SECRET"):          # origin verification (see tuition_api)
+            headers["x-gateway-key"] = os.environ["GATEWAY_SHARED_SECRET"]
         headers.update({"x-request-id": rid, "x-gateway-route": route.id,
                         "x-forwarded-for": request.client.host if request.client else "unknown"})
         try:

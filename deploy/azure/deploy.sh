@@ -11,7 +11,8 @@
 set -euo pipefail
 
 RG=${RG:-rg-se4458-tuition}
-LOC=${LOC:-westeurope}
+LOC=${LOC:-swedencentral}   # Azure for Students allows only a few regions: check
+#   az policy assignment list --disable-scope-strict-match --query "[].parameters.listOfAllowedLocations.value"
 SUFFIX=${SUFFIX:-$RANDOM}
 ACR=${ACR:-se4458tuition$SUFFIX}            # globally unique, lowercase
 PG=${PG:-se4458-tuition-pg-$SUFFIX}         # globally unique
@@ -19,6 +20,7 @@ ENV=${ENV_NAME:-se4458-tuition-env}
 PG_USER=tuitionadmin
 PG_PASS=${PG_PASS:-"P$(openssl rand -hex 12)!a"}
 JWT_SECRET=${JWT_SECRET:-$(openssl rand -hex 32)}
+GATEWAY_SECRET=${GATEWAY_SECRET:-$(openssl rand -hex 32)}
 LLM_PROVIDER=${LLM_PROVIDER:-anthropic}
 LLM_MODEL=${LLM_MODEL:-claude-haiku-5-5}
 IMAGE=tuition:1.0
@@ -30,8 +32,11 @@ az provider register -n Microsoft.OperationalInsights --wait
 echo "== resource group, registry, image"
 az group create -n "$RG" -l "$LOC" -o none
 az acr create -g "$RG" -n "$ACR" --sku Basic --admin-enabled true -o none
-az acr build -r "$ACR" -t "$IMAGE" . -o none
 ACR_SERVER=$(az acr show -n "$ACR" --query loginServer -o tsv)
+# ACR Tasks (az acr build) is not available on student subscriptions -> build locally and push
+az acr login -n "$ACR"
+docker build -t "$ACR_SERVER/$IMAGE" .
+docker push "$ACR_SERVER/$IMAGE"
 ACR_PASS=$(az acr credential show -n "$ACR" --query "passwords[0].value" -o tsv)
 
 echo "== PostgreSQL Flexible Server (Burstable B1ms)"
@@ -39,7 +44,7 @@ az postgres flexible-server create -g "$RG" -n "$PG" -l "$LOC" \
   --tier Burstable --sku-name Standard_B1ms --storage-size 32 --version 16 \
   --admin-user "$PG_USER" --admin-password "$PG_PASS" \
   --public-access 0.0.0.0 --yes -o none          # 0.0.0.0 = allow Azure services only
-az postgres flexible-server db create -g "$RG" -s "$PG" -d tuition -o none
+az postgres flexible-server db create --resource-group "$RG" --server-name "$PG" --name tuition -o none
 DB_URL="postgresql://$PG_USER:$PG_PASS@$PG.postgres.database.azure.com:5432/tuition?sslmode=require"
 
 echo "== Container Apps environment"
@@ -49,16 +54,21 @@ common=(--resource-group "$RG" --environment "$ENV" --image "$ACR_SERVER/$IMAGE"
         --registry-server "$ACR_SERVER" --registry-username "$ACR" --registry-password "$ACR_PASS"
         --cpu 0.25 --memory 0.5Gi --min-replicas 0 --max-replicas 1 -o none)
 
-echo "== tuition-api (internal ingress: reachable only inside the environment)"
-az containerapp create -n tuition-api "${common[@]}" --ingress internal --target-port 8001 \
-  --secrets db-url="$DB_URL" jwt="$JWT_SECRET" \
-  --env-vars SERVICE=tuition-api DATABASE_URL=secretref:db-url JWT_SECRET=secretref:jwt
+echo "== tuition-api (only callable through the gateway: origin verification via shared secret)"
+# Internal-ingress name resolution (http://tuition-api, *.internal.*) did not work in this
+# environment type, so the API has HTTPS ingress but rejects every /api call that does not
+# carry the X-Gateway-Key header the gateway adds -> 403 DIRECT_ACCESS_FORBIDDEN.
+az containerapp create -n tuition-api "${common[@]}" --ingress external --target-port 8001 --min-replicas 1 \
+  --secrets db-url="$DB_URL" jwt="$JWT_SECRET" gw-key="$GATEWAY_SECRET" \
+  --env-vars SERVICE=tuition-api DATABASE_URL=secretref:db-url JWT_SECRET=secretref:jwt \
+             GATEWAY_SHARED_SECRET=secretref:gw-key
+API=$(az containerapp show -g "$RG" -n tuition-api --query properties.configuration.ingress.fqdn -o tsv)
 
 echo "== gateway (public)"
 az containerapp create -n gateway "${common[@]}" --ingress external --target-port 8000 \
-  --secrets db-url="$DB_URL" jwt="$JWT_SECRET" \
+  --secrets db-url="$DB_URL" jwt="$JWT_SECRET" gw-key="$GATEWAY_SECRET" \
   --env-vars SERVICE=gateway DATABASE_URL=secretref:db-url JWT_SECRET=secretref:jwt \
-             TUITION_API_URL=http://tuition-api
+             GATEWAY_SHARED_SECRET=secretref:gw-key TUITION_API_URL="https://$API"
 
 echo "== mcp-server (public, read-only policy search)"
 az containerapp create -n mcp-server "${common[@]}" --ingress external --target-port 8765 \

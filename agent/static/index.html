@@ -88,6 +88,7 @@ async function login() {
     $("who").textContent = `Student ${d.studentNo} · ${d.model}`;
     $("dot").classList.add("on");
     $("login").hidden = true; $("chat").hidden = false; $("composer").hidden = false;
+    $("examples").querySelectorAll("button").forEach(b => b.remove());   // no duplicates on re-login
     for (const e of EXAMPLES) {
       const b = document.createElement("button"); b.textContent = e;
       b.onclick = () => { $("msg").value = e; send(); }; $("examples").appendChild(b);
